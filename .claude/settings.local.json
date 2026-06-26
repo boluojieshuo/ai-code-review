@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from database import engine, Base, get_db; print\\('database.py OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('main.py syntax OK'\\)\")",
+      "Bash(npx vite *)"
+    ]
+  }
+}
