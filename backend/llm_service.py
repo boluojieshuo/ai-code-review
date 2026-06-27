@@ -1,14 +1,21 @@
-import dashscope
 import os
 import json
+from openai import OpenAI
 from dotenv import load_dotenv
 
-# 读取配置（服务端环境变量，用户无需关心）
+# 读取服务端环境变量
 load_dotenv()
 
-dashscope.api_key = os.getenv("DASHSCOPE_API_KEY")
-if not dashscope.api_key:
+API_KEY = os.getenv("DASHSCOPE_API_KEY")
+if not API_KEY:
     print("WARNING: DASHSCOPE_API_KEY not set — AI review will fail")
+
+# 使用国际站端点（美国 → 新加坡，比直连国内稳定）
+client = OpenAI(
+    api_key=API_KEY,
+    base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+)
+
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen-plus")
 
 
@@ -138,44 +145,37 @@ def review_code(code_content: str, language: str, file_name: str = "untitled", r
     else:
         raise ValueError(f"Unknown review_type: {review_type}")
 
-    # 调用通义千问 API
-    messages = [
-        {"role": "user", "content": prompt}
-    ]
-
+    # 调用通义千问 API（OpenAI 兼容接口，国际站）
     try:
-        response = dashscope.Generation.call(
+        response = client.chat.completions.create(
             model=LLM_MODEL,
-            messages=messages,
-            result_format='message',
+            messages=[{"role": "user", "content": prompt}],
         )
 
-        # 获取返回内容
-        if response.status_code == 200:
-            result_text = response.output.choices[0].message.content
+        result_text = response.choices[0].message.content
 
-            # 去掉可能的 markdown 代码块标记
-            result_text = result_text.strip()
-            # Remove ```json / ``` wrapping
-            import re
-            m = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', result_text, re.DOTALL)
-            if m:
-                result_text = m.group(1).strip()
-            else:
-                if result_text.startswith("```json"):
-                    result_text = result_text[7:]
-                if result_text.startswith("```"):
-                    result_text = result_text[3:]
-                if result_text.endswith("```"):
-                    result_text = result_text[:-3]
-            result_text = result_text.strip()
-
-            # 解析成 JSON
-            result = json.loads(result_text)
-            return result
-        else:
-            print("API 调用失败:", response)
+        if not result_text:
+            print("API 返回空内容 — 请检查 DASHSCOPE_API_KEY 是否正确")
             return None
+
+        # 去掉可能的 markdown 代码块标记
+        result_text = result_text.strip()
+        import re
+        m = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', result_text, re.DOTALL)
+        if m:
+            result_text = m.group(1).strip()
+        else:
+            if result_text.startswith("```json"):
+                result_text = result_text[7:]
+            if result_text.startswith("```"):
+                result_text = result_text[3:]
+            if result_text.endswith("```"):
+                result_text = result_text[:-3]
+        result_text = result_text.strip()
+
+        # 解析成 JSON
+        result = json.loads(result_text)
+        return result
 
     except Exception as e:
         print("调用大模型出错:", e)
