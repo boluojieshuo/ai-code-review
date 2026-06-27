@@ -10,10 +10,10 @@ API_KEY = os.getenv("DASHSCOPE_API_KEY")
 if not API_KEY:
     print("WARNING: DASHSCOPE_API_KEY not set — AI review will fail")
 
-# 使用国际站端点（美国 → 新加坡，比直连国内稳定）
+# 使用国内端点
 client = OpenAI(
     api_key=API_KEY,
-    base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
 
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen-plus")
